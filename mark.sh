@@ -1435,9 +1435,9 @@ The current machine is $basearch, but it seems the ISO is for $iso_arch. Continu
 
         [ -n "$boot_wim" ] && test_url "$boot_wim" 'wim'
 
-        eval "${step}_iso='$iso'"
-        eval "${step}_boot_wim='$boot_wim'"
-        eval "${step}_image_name='$image_name'"
+        printf -v "${step}_iso" '%s' "$iso"
+        printf -v "${step}_boot_wim" '%s' "$boot_wim"
+        printf -v "${step}_image_name" '%s' "$image_name"
     }
 
     # shellcheck disable=SC2154
