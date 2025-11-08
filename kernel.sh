@@ -75,7 +75,7 @@ curl -O https://raw.githubusercontent.com/AKUMAVM/launch/main/mark.sh || wget -O
     13) bash mark.sh windows --image-name='Windows Server 2025 SERVERDATACENTER' --iso='https://go.microsoft.com/fwlink/p/?LinkID=2293312' --password Akuma12345 --allow-ping ;;
     14) bash mark.sh windows --image-name='Windows 10 Pro' --iso='https://iso.akumavm.com/winx10.iso' --password Akuma12345 --allow-ping ;;
     15) bash mark.sh windows --image-name='Windows 11 Pro' --iso='https://iso.akumavm.com/winx11.iso' --password Akuma12345 --allow-ping ;;
-    16) bash mark.sh windows --image-name='Windows X-Lite 'Micro 10'' --iso='https://iso.akumavm.com/micro10.iso' --password Akuma12345 --allow-ping ;;
+    16) bash mark.sh windows --image-name="Windows X-Lite 'Micro 10'" --iso='https://iso.akumavm.com/micro10.iso' --password Akuma12345 --allow-ping ;;
     17) bash mark.sh netboot.xyz ;;
     99)
       echo -e "\n"
