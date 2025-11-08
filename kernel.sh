@@ -53,7 +53,8 @@ curl -O https://raw.githubusercontent.com/AKUMAVM/launch/main/mark.sh || wget -O
   echo "  13) Windows Server 2025 DC"
   echo "  14) Windows X Lite 10 Pro"
   echo "  15) Windows X Lite 11 Pro"
-  echo "  16) Netboot"
+  echo "  16) Windows 10 Pro Ultralight"
+  echo "  17) Netboot"
   echo "  99) Custom DD image"
   echo "  0) Exit"
   echo -ne "\nYour option: "
@@ -74,7 +75,8 @@ curl -O https://raw.githubusercontent.com/AKUMAVM/launch/main/mark.sh || wget -O
     13) bash mark.sh windows --image-name='Windows Server 2025 SERVERDATACENTER' --iso='https://go.microsoft.com/fwlink/p/?LinkID=2293312' --password Akuma12345 --allow-ping ;;
     14) bash mark.sh windows --image-name='Windows 10 Pro' --iso='https://iso.akumavm.com/winx10.iso' --password Akuma12345 --allow-ping ;;
     15) bash mark.sh windows --image-name='Windows 11 Pro' --iso='https://iso.akumavm.com/winx11.iso' --password Akuma12345 --allow-ping ;;
-    16) bash mark.sh netboot.xyz ;;
+    16) bash mark.sh windows --image-name='Windows X-Lite 'Micro 10'' --iso='https://iso.akumavm.com/micro10.iso' --password Akuma12345 --allow-ping ;;
+    17) bash mark.sh netboot.xyz ;;
     99)
       echo -e "\n"
       read -r -p "Custom DD image URL: " imgURL
