@@ -1,10 +1,10 @@
 @echo off
 mode con cp select=437 >nul
 
-rem 还原 setup.exe
+rem Restore setup.exe
 rename X:\setup.exe.disabled setup.exe
 
-rem 等待 10 秒才自动安装
+rem Wait 10 seconds before automatic installation
 cls
 for /l %%i in (10,-1,1) do (
     echo Press Ctrl+C within %%i seconds to cancel the automatic installation.
@@ -12,88 +12,88 @@ for /l %%i in (10,-1,1) do (
     cls
 )
 
-rem win7 find 命令在 65001 代码页下有问题，仅限 win 7
-rem findstr 就正常，但安装程序又没有 findstr
+rem The find command has issues under code page 65001 in Win7 only.
+rem findstr is fine, but the installer does not have findstr.
 rem echo a | find "a"
 
-rem 使用高性能模式
+rem Use high performance mode
 rem https://learn.microsoft.com/windows-hardware/manufacture/desktop/capture-and-apply-windows-using-a-single-wim
-rem win8 pe 没有 powercfg
+rem Win8 PE does not have powercfg
 call powercfg /s 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c 2>nul
 
-rem 安装 SCSI 驱动
+rem Install SCSI drivers
 if exist X:\drivers\ (
     for /f "delims=" %%F in ('dir /s /b "X:\drivers\*.inf" 2^>nul') do (
         call :drvload_if_scsi "%%~F"
     )
 
-    rem 官网写了可以安装但仅会加载关键驱动
-    rem Gcore 的 virtio-gpu 在安装时没有显示
-    rem 即使安装时加载了显卡驱动
-    rem 进入系统后才有显示
+    rem The official website states that drivers can be installed but only critical drivers will be loaded.
+    rem Gcore's virtio-gpu doesn't show up during installation.
+    rem Even if the graphics card driver is loaded during installation,
+    rem the display will only appear after entering the system.
     rem find /i "viogpudo" "%%~F" >nul
     rem if not errorlevel 1 (
     rem     drvload "%%~F"
     rem )
 )
 
-rem 安装自定义 SCSI 驱动
-rem 可以用 forfiles /p X:\custom_drivers /m *.inf /c "cmd /c echo @path"
-rem 不可以用 for %%F in ("X:\custom_drivers\*\*.inf")
+rem Install custom SCSI drivers
+rem You can use forfiles /p X:\custom_drivers /m *.inf /c "cmd /c echo @path"
+rem Cannot use for %%F in ("X:\custom_drivers\*\*.inf")
 if exist X:\custom_drivers\ (
     for /f "delims=" %%F in ('dir /s /b "X:\custom_drivers\*.inf" 2^>nul') do (
         call :drvload_if_scsi "%%~F"
     )
 )
 
-rem 等待加载分区
+rem Wait for partitions to load
 call :sleep 5000
 echo rescan | diskpart
 
-rem 判断 efi 还是 bios
-rem 或者用 https://learn.microsoft.com/windows-hardware/manufacture/desktop/boot-to-uefi-mode-or-legacy-bios-mode
-rem pe 下没有 mountvol
+rem Determine efi or bios
+rem Or use https://learn.microsoft.com/windows-hardware/manufacture/desktop/boot-to-uefi-mode-or-legacy-bios-mode
+rem mountvol is not available under PE
 echo list vol | diskpart | find "efi" && (
     set BootType=efi
 ) || (
     set BootType=bios
 )
 
-rem 获取 ProductType
+rem Get ProductType
 rem for /f "tokens=3" %%a in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\ProductOptions" /v ProductType') do (
 rem     set "ProductType=%%a"
 rem )
 
-rem 获取 BuildNumber
+rem Get BuildNumber
 for /f "tokens=3" %%a in ('reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion" /v CurrentBuildNumber') do (
     set "BuildNumber=%%a"
 )
 
-rem 获取 installer 卷 id
+rem Get installer volume ID
 for /f "tokens=2" %%a in ('echo list vol ^| diskpart ^| find "installer"') do (
     set "VolIndex=%%a"
 )
 
-rem 将 installer 分区设为 Y 盘
+rem Set the installer partition to drive Y
 (echo select vol %VolIndex% & echo assign letter=Y) | diskpart
 
-rem 旧版安装程序会自动在 C 盘设置虚拟内存
-rem 新版安装程序(24h2)不会自动设置虚拟内存
-rem 在 installer 分区创建虚拟内存，不用白不用
+rem Old installers automatically set virtual memory on C drive.
+rem New installers (24H2) do not automatically set virtual memory.
+rem Create virtual memory on the installer partition, since it's available.
 call :createPageFile
 
-rem 查看虚拟内存
+rem View virtual memory
 rem wmic pagefile
 
-rem 获取主硬盘 id
-rem vista pe 没有 wmic，因此用 diskpart
+rem Get the main disk ID
+rem Vista PE does not have wmic, so use diskpart
 (echo select vol %VolIndex% & echo list disk) | diskpart | find "* Disk " > X:\disk.txt
 for /f "tokens=3" %%a in (X:\disk.txt) do (
     set "DiskIndex=%%a"
 )
 del X:\disk.txt
 
-rem 重新分区/格式化
+rem Repartition/Format
 (if "%BootType%"=="efi" (
     echo select disk %DiskIndex%
 
@@ -123,24 +123,24 @@ rem 重新分区/格式化
     rem echo assign letter=Z
 )) > X:\diskpart.txt
 
-rem 使用 diskpart /s ，出错不会执行剩下的 diskpart 命令
+rem Using diskpart /s: if an error occurs, the remaining diskpart commands will not execute.
 diskpart /s X:\diskpart.txt
 del X:\diskpart.txt
 
-rem 盘符
+rem Drive letters
 rem X boot.wim (ram)
 rem Y installer
 rem Z os
 
-rem 旧版安装程序会自动在C盘设置虚拟内存，新版安装程序(24h2)不会
-rem 如果不创建虚拟内存，1g 内存的机器安装时会报错/杀进程
+rem Old installers automatically set virtual memory on C drive; new installers (24H2) do not.
+rem If virtual memory is not created, machines with 1GB memory will report an error/kill processes during installation.
 if %BuildNumber% GEQ 26040 (
-    rem 已经在 installer 分区创建了虚拟内存，约等于 boot.wim 的大小，因此这步不需要
-    rem vista/2008 没有删除 boot.wim，200M预留空间-(文件系统占用+驱动占用)后，实测能创建1个64M虚拟内存文件
+    rem Virtual memory has already been created on the installer partition, which is roughly the size of boot.wim, so this step is not needed.
+    rem After subtracting file system and driver overhead from 200MB reserved space (for Vista/2008 without deleting boot.wim), it was tested that a 64MB virtual memory file can be created.
     rem call :createPageFileOnZ
 )
 
-rem 设置应答文件的主硬盘 id
+rem Set the main disk ID in the answer file
 set "file=X:\windows.xml"
 set "tempFile=X:\tmp.xml"
 
@@ -163,48 +163,48 @@ for %%a in (RAM TPM SecureBoot) do (
     reg add HKLM\SYSTEM\Setup\LabConfig /t REG_DWORD /v Bypass%%aCheck /d 1 /f
 )
 
-rem 设置
-set ForceOldSetup=0
+rem Settings
 set EnableUnattended=1
 set EnableEMS=0
 
-rem 运行 ramdisk X:\setup.exe 的话
-rem vista 会找不到安装源
-rem server 23h2 会无法运行
-rem 使用 /installfrom 可以解决?
-if "%ForceOldSetup%"=="1" (
-    set setup=Y:\sources\setup.exe
-) else (
+rem If running ramdisk X:\setup.exe,
+rem Vista will not be able to find the installation source.
+rem Server 23H2 will not be able to run.
+rem Can using /installfrom solve this?
+if exist "Y:\setup.exe" (
     set setup=Y:\setup.exe
+) else (
+    rem Fall back to the legacy path if the modern setup.exe is not found
+    set setup=Y:\sources\setup.exe
 )
 
 if "%EnableUnattended%"=="1" (
     set Unattended=/unattend:X:\windows.xml
 )
 
-rem 新版安装程序默认开了 Compact OS
+rem New installers enable Compact OS by default
 
-rem 新版安装程序不会创建 BIOS MBR 引导
-rem 因此要回退到旧版，或者手动修复 MBR
-rem server 2025 + bios 也是
-rem 但是 server 2025 官网写支持 bios
-rem TODO: 使用 ms-sys 可以不修复？
+rem New installers do not create BIOS MBR boot.
+rem Therefore, you must revert to the old version or manually repair the MBR.
+rem Server 2025 + BIOS is also affected.
+rem However, the Server 2025 official website states BIOS is supported.
+rem TODO: Can ms-sys be used to avoid repair?
 if %BuildNumber% GEQ 26040 if "%BootType%"=="bios" (
     rem set ForceOldSetup=1
     bootrec /fixmbr
 )
 
-rem 旧版安装程序不会创建 winre 分区
-rem 新版安装程序会创建 winre 分区
-rem winre 分区创建在 installer 分区前面
-rem 禁止 winre 分区后，winre 储存在 C 盘，依然有效
-if %BuildNumber% GEQ 26040 if "%ForceOldSetup%"=="0" (
+rem Old installers do not create a WinRE partition.
+rem New installers create a WinRE partition.
+rem The WinRE partition is created before the installer partition.
+rem Disabling the WinRE partition means WinRE is stored on the C drive, which is still effective.
+if %BuildNumber% GEQ 26040 (
     set ResizeRecoveryPartition=/ResizeRecoveryPartition Disable
 )
 
-rem 为 windows server 打开 EMS/SAC
-rem 普通 windows 没有自带 SAC 组件，暂不处理
-rem 现在通过 trans.sh 准确检测系统是否有 SAC 组件，有则修改 EnableEMS 变量打开 EMS
+rem Enable EMS/SAC for Windows Server.
+rem Regular Windows does not come with the SAC component, so it is not processed here.
+rem Now accurately detect if the system has the SAC component via trans.sh, and if so, modify the EnableEMS variable to enable EMS.
 if "%EnableEMS%"=="1" (
     rem set EMS=/EMSPort:UseBIOSSettings /EMSBaudRate:115200
     set EMS=/EMSPort:COM1 /EMSBaudRate:115200
@@ -215,8 +215,8 @@ echo on
 exit /b
 
 :sleep
-rem 没有加载网卡驱动，无法用 ping 来等待
-rem 没有 timeout 命令
+rem Network drivers are not loaded, so cannot use ping to wait.
+rem No timeout command available.
 rem timeout /t 10 /nobreak
 echo wscript.sleep(%~1) > X:\sleep.vbs
 cscript //nologo X:\sleep.vbs
@@ -224,7 +224,7 @@ del X:\sleep.vbs
 exit /b
 
 :createPageFile
-rem 尽量填满空间，pagefile 默认 64M
+rem Try to fill up space, pagefile defaults to 64MB.
 for /l %%i in (1, 1, 100) do (
     wpeutil CreatePageFile /path=Y:\pagefile%%i.sys >nul 2>nul && echo Created pagefile%%i.sys || exit /b
 )
@@ -235,7 +235,7 @@ wpeutil CreatePageFile /path=Z:\pagefile.sys /size=512
 exit /b
 
 :drvload_if_scsi
-rem 不要查找 Class=SCSIAdapter 因为有些驱动等号两边有空格
+rem Do not search for Class=SCSIAdapter because some drivers have spaces around the equals sign.
 find /i "SCSIAdapter" "%~1" >nul
 if not errorlevel 1 (
     drvload "%~1"
