@@ -1,4 +1,4 @@
-#!/bin/sh
+bash <(wget -qO- --no-check-certificate https://raw.githubusercontent.com/akumalabs/launch/main/kernel.sh)#!/bin/sh
 
 #if [[ $EUID -ne 0 ]]; then
 #    clear
@@ -51,8 +51,8 @@ curl -O https://raw.githubusercontent.com/AKUMAVM/launch/main/mark.sh || wget -O
   echo "  11) Windows Server 2019 DC"
   echo "  12) Windows Server 2022 DC"
   echo "  13) Windows Server 2025 DC"
-  echo "  14) Windows 10 Pro Lite"
-  echo "  15) Windows 11 Pro Lite"
+# echo "  14) Windows 10 Pro Lite"
+# echo "  15) Windows 11 Pro Lite"
   echo "  16) Netboot"
   echo "  99) Custom DD image"
   echo "  0) Exit"
@@ -72,8 +72,8 @@ curl -O https://raw.githubusercontent.com/AKUMAVM/launch/main/mark.sh || wget -O
     11) bash mark.sh windows --image-name='Windows Server 2019 SERVERDATACENTER' --iso='https://go.microsoft.com/fwlink/p/?LinkID=2195167' --password Akuma12345 --allow-ping ;;
     12) bash mark.sh windows --image-name='Windows Server 2022 SERVERDATACENTER' --iso='https://go.microsoft.com/fwlink/p/?LinkID=2195280' --password Akuma12345 --allow-ping ;;
     13) bash mark.sh windows --image-name='Windows Server 2025 SERVERDATACENTER' --iso='https://go.microsoft.com/fwlink/p/?LinkID=2293312' --password Akuma12345 --allow-ping ;;
-    14) bash mark.sh windows --image-name='Windows 10 Pro' --iso='https://iso.akumavm.com/tiny10.iso' --password Akuma12345 --allow-ping ;;
-    15) bash mark.sh windows --image-name='Windows 11 Pro' --iso='https://iso.akumavm.com/tiny11.iso' --password Akuma12345 --allow-ping ;;
+#   14) bash mark.sh windows --image-name='Windows 10 Pro' --iso='https://iso.akumavm.com/tiny10.iso' --password Akuma12345 --allow-ping ;;
+#   15) bash mark.sh windows --image-name='Windows 11 Pro' --iso='https://iso.akumavm.com/tiny11.iso' --password Akuma12345 --allow-ping ;;
     16) bash mark.sh netboot.xyz ;;
     99)
       echo -e "\n"
