@@ -41,38 +41,38 @@ if defined mac_addr (
     )
 )
 
-REM Download and install Qemu Agent
-powershell -Command "(New-Object System.Net.WebClient).DownloadFile('https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.262-2/virtio-win-guest-tools.exe', 'C:\Windows\Temp\virtio-win-guest-tools.exe')" <NUL
-cmd /c C:\Windows\Temp\virtio-win-guest-tools.exe /quiet /norestart
-del C:\Windows\Temp\virtio-win-guest-tools.exe
+#REM Download and install Qemu Agent
+#powershell -Command "(New-Object System.Net.WebClient).DownloadFile('https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.262-2/virtio-win-guest-tools.exe', 'C:\Windows\Temp\virtio-win-guest-tools.exe')" <NUL
+#cmd /c C:\Windows\Temp\virtio-win-guest-tools.exe /quiet /norestart
+#del C:\Windows\Temp\virtio-win-guest-tools.exe
 
-REM Remove OneDrive
-set onedrive=%SystemRoot%\SysWOW64\OneDriveSetup.exe
-if not exist "%onedrive%" (
-    set onedrive=%SystemRoot%\System32\OneDriveSetup.exe
-)
+#REM Remove OneDrive
+3set onedrive=%SystemRoot%\SysWOW64\OneDriveSetup.exe
+#if not exist "%onedrive%" (
+#    set onedrive=%SystemRoot%\System32\OneDriveSetup.exe
+#)
 
-taskkill /F /IM OneDrive.exe /T
-timeout /t 2 > nul
-"%onedrive%" /uninstall
-timeout /t 2 > nul
+#taskkill /F /IM OneDrive.exe /T
+#timeout /t 2 > nul
+#"%onedrive%" /uninstall
+#timeout /t 2 > nul
 
-rmdir "%USERPROFILE%\OneDrive" /S /Q
-rmdir "%LOCALAPPDATA%\Microsoft\OneDrive" /S /Q
-rmdir "%PROGRAMDATA%\Microsoft OneDrive" /S /Q
-if exist "%SYSTEMDRIVE%\OneDriveTemp" (
-    rmdir "%SYSTEMDRIVE%\OneDriveTemp" /S /Q
-)
+#rmdir "%USERPROFILE%\OneDrive" /S /Q
+#rmdir "%LOCALAPPDATA%\Microsoft\OneDrive" /S /Q
+#rmdir "%PROGRAMDATA%\Microsoft OneDrive" /S /Q
+#if exist "%SYSTEMDRIVE%\OneDriveTemp" (
+ #   rmdir "%SYSTEMDRIVE%\OneDriveTemp" /S /Q
+#)
 
-REM Remove memory dump files
-del /q /f "C:\Windows\*.DMP"
-for /d %%D in ("C:\Windows\Minidump") do rd /s /q "%%D"
+#REM Remove memory dump files
+#del /q /f "C:\Windows\*.DMP"
+#for /d %%D in ("C:\Windows\Minidump") do rd /s /q "%%D"
 
-REM Download and run system optimizer
-powershell -Command "(New-Object System.Net.WebClient).DownloadFile('https://install.virtfusion.net/optimize.exe', 'C:\Windows\Temp\optimize.exe')" <NUL
-cmd /c C:\Windows\Temp\optimize.exe -v -o -g -windowsupdate disable -storeapp remove-all -antivirus disable
-cmd /c C:\Windows\Temp\optimize.exe -f 3 4 5 6 9
-del C:\Windows\Temp\optimize.exe
+#REM Download and run system optimizer
+#powershell -Command "(New-Object System.Net.WebClient).DownloadFile('https://install.virtfusion.net/optimize.exe', 'C:\Windows\Temp\optimize.exe')" <NUL
+#cmd /c C:\Windows\Temp\optimize.exe -v -o -g -windowsupdate disable -storeapp remove-all -antivirus disable
+#cmd /c C:\Windows\Temp\optimize.exe -f 3 4 5 6 9
+#del C:\Windows\Temp\optimize.exe
 
 REM Set account lockout threshold to 0 (disable)
 net accounts /lockoutthreshold:0
