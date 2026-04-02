@@ -2,7 +2,7 @@
 mode con cp select=437 >nul
 setlocal EnableDelayedExpansion
 
-set confhome=https://raw.githubusercontent.com/AKUMAVM/launch/main
+set confhome=https://raw.githubusercontent.com/akumalabs/launch/main
 
 cd /d %~dp0
 

@@ -1,4 +1,4 @@
-bash <(wget -qO- --no-check-certificate https://raw.githubusercontent.com/akumalabs/launch/main/kernel.sh)#!/bin/sh
+#!/usr/bin/env bash
 
 #if [[ $EUID -ne 0 ]]; then
 #    clear
@@ -34,7 +34,7 @@ function CopyRight() {
 function Start() {
   CopyRight
   
-curl -O https://raw.githubusercontent.com/AKUMAVM/launch/main/mark.sh || wget -O mark.sh $_
+curl -O https://raw.githubusercontent.com/akumalabs/launch/main/mark.sh || wget -O mark.sh $_
 
 
   echo -e "\nPlease select an OS:"

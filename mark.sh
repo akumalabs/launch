@@ -3,7 +3,7 @@
 # shellcheck disable=SC2086
 
 set -eE
-confhome=https://raw.githubusercontent.com/AKUMAVM/launch/main
+confhome=https://raw.githubusercontent.com/akumalabs/launch/main
 #confhome_cn=https://www.ghproxy.cc/https://raw.githubusercontent.com/bin456789/reinstall/main
 # confhome_cn=https://jihulab.com/bin456789/reinstall/-/raw/main
 
@@ -74,7 +74,7 @@ Usage: $reinstall_____ anolis      7|8|23
                        [--web-port PORT]
                        [--allow-ping]
 
-Manual: https://github.com/AKUMAVM/launch
+Manual: https://github.com/akumalabs/launch
 
 EOF
     exit 1
@@ -3866,6 +3866,8 @@ if is_in_china; then
         confhome=${confhome/https:\/\/raw.githubusercontent.com/$github_proxy}
     fi
 fi
+
+info false "Effective confhome: $confhome"
 
 # 以下目标系统不需要两步安装
 # alpine
