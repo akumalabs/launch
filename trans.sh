@@ -5121,14 +5121,10 @@ if !bits! GTR 32 set bits=32
 set mask=
 for %%i in (1 2 3 4) do (
     if !bits! GEQ 8 (
-        set /a octet=255
+        set "octet=255"
         set /a bits-=8
     ) else (
-        if !bits! EQU 0 (
-            set /a octet=0
-        ) else (
-            set /a octet=256 - (1 << (8 - bits))
-        )
+        call :bits_to_octet !bits! octet
         set bits=0
     )
     if defined mask (
@@ -5138,6 +5134,23 @@ for %%i in (1 2 3 4) do (
     )
 )
 endlocal & set %2=%mask%
+goto :eof
+
+:bits_to_octet
+setlocal
+set "b=%~1"
+set "o="
+if "%b%"=="0" set "o=0"
+if "%b%"=="1" set "o=128"
+if "%b%"=="2" set "o=192"
+if "%b%"=="3" set "o=224"
+if "%b%"=="4" set "o=240"
+if "%b%"=="5" set "o=248"
+if "%b%"=="6" set "o=252"
+if "%b%"=="7" set "o=254"
+if "%b%"=="8" set "o=255"
+if not defined o set "o=0"
+endlocal & set "%~2=%o%"
 goto :eof
 
 :run_cmd
