@@ -9,10 +9,10 @@ if /I "%~1"=="retry-run" (
 )
 
 set "task_name=AkumaNetconfRetry-%~n0"
-set "task_cmd=cmd /c call ""%~f0"" retry-run"
 set "log_file=%SystemDrive%\windows-set-netconf.log"
 set "netconf_success=0"
-set "apply_error=0"
+set "critical_error=0"
+set "warning_error=0"
 
 if not defined mac_addr set "mac_addr="
 if not defined ipv4_cidr set "ipv4_cidr="
@@ -67,40 +67,55 @@ if defined ipv6_cidr (
 if defined ipv4_addr if defined ipv4_gateway if defined ipv4_mask (
     call :log "mode ipv4=static ip=!ipv4_addr!/!ipv4_prefix! gw=!ipv4_gateway!"
     call :run_cmd "netsh interface ipv4 set address name=""%ifname%"" static !ipv4_addr! !ipv4_mask! !ipv4_gateway! 1"
-    if errorlevel 1 set "apply_error=1"
+    if errorlevel 1 (
+        call :verify_ipv4_static
+        if errorlevel 1 (
+            set "critical_error=1"
+        ) else (
+            set "warning_error=1"
+            call :log "WARN: ipv4 set-address returned non-zero but target address is active"
+        )
+    ) else (
+        call :verify_ipv4_static
+        if errorlevel 1 set "critical_error=1"
+    )
     call :apply_ipv4_dns
-    if errorlevel 1 set "apply_error=1"
+    if errorlevel 1 set "warning_error=1"
 ) else (
     call :log "mode ipv4=dhcp"
     call :run_cmd "netsh interface ipv4 set address name=""%ifname%"" dhcp"
-    if errorlevel 1 set "apply_error=1"
+    if errorlevel 1 set "critical_error=1"
     call :run_cmd "netsh interface ipv4 set dnsservers name=""%ifname%"" dhcp"
-    if errorlevel 1 set "apply_error=1"
+    if errorlevel 1 set "warning_error=1"
 )
 
 if defined ipv6_addr if defined ipv6_gateway if defined ipv6_prefix (
     call :log "mode ipv6=static ip=!ipv6_addr!/!ipv6_prefix! gw=!ipv6_gateway!"
     call :run_cmd "netsh interface ipv6 add address interface=""%ifname%"" !ipv6_addr!/!ipv6_prefix!"
-    if errorlevel 1 set "apply_error=1"
+    if errorlevel 1 set "critical_error=1"
     call :run_cmd "netsh interface ipv6 add route ::/0 interface=""%ifname%"" !ipv6_gateway!"
-    if errorlevel 1 set "apply_error=1"
+    if errorlevel 1 set "critical_error=1"
     call :apply_ipv6_dns
-    if errorlevel 1 set "apply_error=1"
+    if errorlevel 1 set "warning_error=1"
 ) else (
     if defined ipv6_dns1 (
         call :log "mode ipv6=auto with dns override"
         call :apply_ipv6_dns
-        if errorlevel 1 set "apply_error=1"
+        if errorlevel 1 set "warning_error=1"
     ) else (
         call :log "mode ipv6=auto"
     )
 )
 
-if "%apply_error%"=="0" (
+if "%critical_error%"=="0" (
     set "netconf_success=1"
-    call :log "network configuration completed without command errors"
+    if "%warning_error%"=="0" (
+        call :log "network configuration completed without command errors"
+    ) else (
+        call :log "network configuration completed with warnings (non-critical command errors)"
+    )
 ) else (
-    call :log "network configuration completed with command errors"
+    call :log "network configuration completed with critical command errors"
 )
 goto cleanup
 
@@ -147,13 +162,13 @@ if not defined ipv4_dns1 (
     exit /b 0
 )
 call :log "apply ipv4 dns primary=%ipv4_dns1%"
-call :run_cmd "netsh interface ipv4 set dnsservers name=""%ifname%"" static %ipv4_dns1% primary"
+call :run_cmd "netsh interface ipv4 set dnsservers name=""%ifname%"" static %ipv4_dns1% primary validate=no"
 if errorlevel 1 exit /b 1
 set /a i=2
 :loop_ipv4_dns
 call set "cur=%%ipv4_dns%i%%%"
 if not defined cur exit /b 0
-call :run_cmd "netsh interface ipv4 add dnsservers name=""%ifname%"" !cur! index=!i!"
+call :run_cmd "netsh interface ipv4 add dnsservers name=""%ifname%"" !cur! index=!i! validate=no"
 if errorlevel 1 exit /b 1
 set /a i+=1
 goto loop_ipv4_dns
@@ -164,13 +179,13 @@ if not defined ipv6_dns1 (
     exit /b 0
 )
 call :log "apply ipv6 dns primary=%ipv6_dns1%"
-call :run_cmd "netsh interface ipv6 set dnsservers interface=""%ifname%"" static %ipv6_dns1% primary"
+call :run_cmd "netsh interface ipv6 set dnsservers interface=""%ifname%"" static %ipv6_dns1% primary validate=no"
 if errorlevel 1 exit /b 1
 set /a i=2
 :loop_ipv6_dns
 call set "cur=%%ipv6_dns%i%%%"
 if not defined cur exit /b 0
-call :run_cmd "netsh interface ipv6 add dnsservers interface=""%ifname%"" !cur! index=!i!"
+call :run_cmd "netsh interface ipv6 add dnsservers interface=""%ifname%"" !cur! index=!i! validate=no"
 if errorlevel 1 exit /b 1
 set /a i+=1
 goto loop_ipv6_dns
@@ -248,13 +263,35 @@ set "cmd_rc=!errorlevel!"
 call :log "cmd rc=!cmd_rc! :: !cmd_line!"
 exit /b !cmd_rc!
 
+:verify_ipv4_static
+powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$cfg=Get-NetIPConfiguration -InterfaceIndex %id% -ErrorAction SilentlyContinue; $ips=@(); $gws=@(); if($cfg){ $ips=@($cfg.IPv4Address | ForEach-Object { $_.IPAddress }); $gws=@($cfg.IPv4DefaultGateway | ForEach-Object { $_.NextHop }) }; if(($ips -contains '%ipv4_addr%') -and ($gws -contains '%ipv4_gateway%')){ exit 0 }; exit 1" >nul 2>&1
+set "verify_rc=!errorlevel!"
+if "!verify_rc!"=="0" (
+    call :log "verify ipv4 static ok ip=%ipv4_addr% gw=%ipv4_gateway%"
+    exit /b 0
+)
+call :log "verify ipv4 static failed ip=%ipv4_addr% gw=%ipv4_gateway%"
+exit /b 1
+
 :ensure_retry_task
+sc query schedule | find /I "RUNNING" >nul 2>&1 || net start schedule >nul 2>&1
+
+set "task_cmd=""%~f0"" retry-run"
 schtasks /Create /TN "%task_name%" /SC ONSTART /RU SYSTEM /RL HIGHEST /TR "%task_cmd%" /F >nul 2>&1
 set "task_rc=%errorlevel%"
-call :log "retry task create rc=!task_rc! task=%task_name%"
+call :log "retry task create rc=!task_rc! task=%task_name% cmd=%task_cmd%"
 if "!task_rc!"=="0" (
     exit /b 0
 )
+
+set "task_cmd=%ComSpec% /c call ""%~f0"" retry-run"
+schtasks /Create /TN "%task_name%" /SC ONSTART /RU SYSTEM /RL HIGHEST /TR "%task_cmd%" /F >nul 2>&1
+set "task_rc=%errorlevel%"
+call :log "retry task create fallback rc=!task_rc! task=%task_name% cmd=%task_cmd%"
+if "!task_rc!"=="0" (
+    exit /b 0
+)
+
 exit /b 1
 
 :remove_retry_task
