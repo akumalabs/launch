@@ -4869,40 +4869,44 @@ create_win_set_netconf_script() {
     target=$1
     info "Create win netconf script"
 
-    if is_staticv4 || is_staticv6 || is_need_manual_set_dnsv6; then
-        get_netconf_to mac_addr
-        echo "set mac_addr=$mac_addr" >$target
+    get_netconf_to mac_addr
+    cat <<EOF >$target
+set mac_addr=$mac_addr
+set ipv4_cidr=
+set ipv4_gateway=
+set ipv6_cidr=
+set ipv6_gateway=
+EOF
 
-        # 生成静态 ipv4 配置
-        if is_staticv4; then
-            get_netconf_to ipv4_addr
-            get_netconf_to ipv4_gateway
-            cat <<EOF >>$target
-set ipv4_addr=$ipv4_addr
+    # 生成静态 ipv4 配置
+    if is_staticv4; then
+        get_netconf_to ipv4_addr
+        get_netconf_to ipv4_gateway
+        cat <<EOF >>$target
+set ipv4_cidr=$ipv4_addr
 set ipv4_gateway=$ipv4_gateway
 $(get_dns_list_for_win 4)
 EOF
-        fi
+    fi
 
-        # 生成静态 ipv6 配置
-        if is_staticv6; then
-            get_netconf_to ipv6_addr
-            get_netconf_to ipv6_gateway
-            cat <<EOF >>$target
-set ipv6_addr=$ipv6_addr
+    # 生成静态 ipv6 配置
+    if is_staticv6; then
+        get_netconf_to ipv6_addr
+        get_netconf_to ipv6_gateway
+        cat <<EOF >>$target
+set ipv6_cidr=$ipv6_addr
 set ipv6_gateway=$ipv6_gateway
 EOF
-        fi
+    fi
 
-        # 有 ipv6 但需设置 dns 的情况
-        if is_need_manual_set_dnsv6; then
-            cat <<EOF >>$target
+    # 有 ipv6 但需设置 dns 的情况
+    if is_need_manual_set_dnsv6; then
+        cat <<EOF >>$target
 $(get_dns_list_for_win 6)
 EOF
-        fi
-
-        cat -n $target
     fi
+
+    cat -n $target
 
     # 脚本还有关闭ipv6隐私id的功能，所以不能省略
     # 合并脚本
