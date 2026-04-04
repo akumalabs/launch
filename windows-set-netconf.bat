@@ -13,6 +13,7 @@ set "log_file=%SystemDrive%\windows-set-netconf.log"
 set "netconf_success=0"
 set "critical_error=0"
 set "warning_error=0"
+set "retry_persist_mode=none"
 
 if not defined mac_addr set "mac_addr="
 if not defined ipv4_cidr set "ipv4_cidr="
@@ -68,16 +69,15 @@ if defined ipv4_addr if defined ipv4_gateway if defined ipv4_mask (
     call :log "mode ipv4=static ip=!ipv4_addr!/!ipv4_prefix! gw=!ipv4_gateway!"
     call :run_cmd "netsh interface ipv4 set address name=""%ifname%"" static !ipv4_addr! !ipv4_mask! !ipv4_gateway! 1"
     if errorlevel 1 (
-        call :verify_ipv4_static
-        if errorlevel 1 (
-            set "critical_error=1"
-        ) else (
-            set "warning_error=1"
-            call :log "WARN: ipv4 set-address returned non-zero but target address is active"
-        )
+        set "warning_error=1"
+        call :log "WARN: ipv4 set-address returned non-zero, validating applied state"
+    )
+    call :verify_ipv4_static
+    if errorlevel 1 (
+        set "critical_error=1"
     ) else (
-        call :verify_ipv4_static
-        if errorlevel 1 set "critical_error=1"
+        call :verify_ipv4_gateway
+        if errorlevel 1 set "warning_error=1"
     )
     call :apply_ipv4_dns
     if errorlevel 1 set "warning_error=1"
@@ -264,23 +264,50 @@ call :log "cmd rc=!cmd_rc! :: !cmd_line!"
 exit /b !cmd_rc!
 
 :verify_ipv4_static
-powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$cfg=Get-NetIPConfiguration -InterfaceIndex %id% -ErrorAction SilentlyContinue; $ips=@(); $gws=@(); if($cfg){ $ips=@($cfg.IPv4Address | ForEach-Object { $_.IPAddress }); $gws=@($cfg.IPv4DefaultGateway | ForEach-Object { $_.NextHop }) }; if(($ips -contains '%ipv4_addr%') -and ($gws -contains '%ipv4_gateway%')){ exit 0 }; exit 1" >nul 2>&1
-set "verify_rc=!errorlevel!"
-if "!verify_rc!"=="0" (
-    call :log "verify ipv4 static ok ip=%ipv4_addr% gw=%ipv4_gateway%"
+setlocal EnableDelayedExpansion
+set "verify_ok=0"
+for /L %%n in (1,1,5) do (
+    powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$cfg=Get-NetIPConfiguration -InterfaceIndex %id% -ErrorAction SilentlyContinue; if(-not $cfg){ exit 1 }; $ips=@($cfg.IPv4Address | ForEach-Object { $_.IPAddress }); if($ips -contains '%ipv4_addr%'){ exit 0 }; exit 1" >nul 2>&1
+    if !errorlevel! EQU 0 (
+        set "verify_ok=1"
+        goto verify_ipv4_static_done
+    )
+    if %%n LSS 5 timeout /t 1 /nobreak >nul
+)
+:verify_ipv4_static_done
+if "!verify_ok!"=="1" (
+    endlocal
+    call :log "verify ipv4 static ok ip=%ipv4_addr%"
     exit /b 0
 )
-call :log "verify ipv4 static failed ip=%ipv4_addr% gw=%ipv4_gateway%"
+endlocal
+call :log "verify ipv4 static failed ip=%ipv4_addr%"
+exit /b 1
+
+:verify_ipv4_gateway
+if not defined ipv4_gateway exit /b 0
+powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$cfg=Get-NetIPConfiguration -InterfaceIndex %id% -ErrorAction SilentlyContinue; if(-not $cfg){ exit 1 }; $gws=@($cfg.IPv4DefaultGateway | ForEach-Object { $_.NextHop }); if($gws -contains '%ipv4_gateway%'){ exit 0 }; exit 1" >nul 2>&1
+set "gw_rc=!errorlevel!"
+if "!gw_rc!"=="0" (
+    call :log "verify ipv4 gateway ok gw=%ipv4_gateway%"
+    exit /b 0
+)
+call :log "WARN: verify ipv4 gateway failed gw=%ipv4_gateway%"
 exit /b 1
 
 :ensure_retry_task
 sc query schedule | find /I "RUNNING" >nul 2>&1 || net start schedule >nul 2>&1
+set "retry_persist_mode=none"
+for /f "tokens=4 delims= " %%a in ('sc query schedule ^| findstr /I "STATE"') do set "schedule_state=%%a"
+if not defined schedule_state set "schedule_state=unknown"
+call :log "schedule service state=%schedule_state%"
 
 set "task_cmd=""%~f0"" retry-run"
 schtasks /Create /TN "%task_name%" /SC ONSTART /RU SYSTEM /RL HIGHEST /TR "%task_cmd%" /F >nul 2>&1
 set "task_rc=%errorlevel%"
 call :log "retry task create rc=!task_rc! task=%task_name% cmd=%task_cmd%"
 if "!task_rc!"=="0" (
+    set "retry_persist_mode=task"
     exit /b 0
 )
 
@@ -289,9 +316,21 @@ schtasks /Create /TN "%task_name%" /SC ONSTART /RU SYSTEM /RL HIGHEST /TR "%task
 set "task_rc=%errorlevel%"
 call :log "retry task create fallback rc=!task_rc! task=%task_name% cmd=%task_cmd%"
 if "!task_rc!"=="0" (
+    set "retry_persist_mode=task"
     exit /b 0
 )
 
+call :ensure_retry_run_key
+if errorlevel 1 exit /b 1
+set "retry_persist_mode=run-key"
+exit /b 0
+
+:ensure_retry_run_key
+set "run_cmd=%ComSpec% /c call ""%~f0"" retry-run"
+reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Run" /v "%task_name%" /t REG_SZ /d "%run_cmd%" /f >nul 2>&1
+set "run_rc=!errorlevel!"
+call :log "retry run-key create rc=!run_rc! value=%task_name%"
+if "!run_rc!"=="0" exit /b 0
 exit /b 1
 
 :remove_retry_task
@@ -308,6 +347,18 @@ if "!task_rc!"=="0" (
 )
 exit /b 1
 
+:remove_retry_run_key
+reg query "HKLM\Software\Microsoft\Windows\CurrentVersion\Run" /v "%task_name%" >nul 2>&1
+if errorlevel 1 (
+    call :log "retry run-key not present: %task_name%"
+    exit /b 0
+)
+reg delete "HKLM\Software\Microsoft\Windows\CurrentVersion\Run" /v "%task_name%" /f >nul 2>&1
+set "run_rc=!errorlevel!"
+call :log "retry run-key delete rc=!run_rc! value=%task_name%"
+if "!run_rc!"=="0" exit /b 0
+exit /b 1
+
 :log
 set "msg=%~1"
 >>"%log_file%" echo [%date% %time%] %msg%
@@ -322,11 +373,22 @@ net accounts /lockoutthreshold:0 >nul 2>&1
 
 if "%netconf_success%"=="1" (
     call :remove_retry_task >nul 2>&1
+    call :remove_retry_run_key >nul 2>&1
     call :log "SUCCESS: network configured, deleting script"
     del "%~f0" >nul 2>&1
     exit /b 0
 )
 
 call :ensure_retry_task >nul 2>&1
-call :log "PENDING: retry task ensured, keeping script"
+if errorlevel 1 (
+    call :log "ERROR: retry persistence setup failed, keeping script"
+    exit /b 1
+)
+if /I "%retry_persist_mode%"=="task" (
+    call :log "PENDING: retry task ensured, keeping script"
+) else if /I "%retry_persist_mode%"=="run-key" (
+    call :log "PENDING: retry run-key ensured, keeping script"
+) else (
+    call :log "PENDING: retry persistence ensured, keeping script"
+)
 exit /b 1
