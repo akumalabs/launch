@@ -1,11 +1,11 @@
 ## Usages
 ## Linux
 ```
-bash <(wget -qO- --no-check-certificate https://raw.githubusercontent.com/akumalabs/launch/main/kernel.sh)
+bash <(wget -qO- --no-check-certificate https://raw.githubusercontent.com/akumalabs/reinstall/main/kernel.sh)
 ```
 ## Windows (PowerShell)
 ```
-certutil -urlcache -f -split https://raw.githubusercontent.com/akumalabs/launch/main/mark.bat
+certutil -urlcache -f -split https://raw.githubusercontent.com/akumalabs/reinstall/main/reinstall.bat
 ```
 ## PVE Auto Config Network
 ```
